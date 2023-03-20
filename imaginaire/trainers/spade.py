@@ -172,7 +172,7 @@ class Trainer(BaseTrainer):
             # print(labels.keys())
             for key in labels.keys():
                 if 'seg' in key:
-                    segmaps = tensor2label(labels[key], label_lengths[key], output_normalized_tensor=True)
+                    segmaps = tensor2label(labels[key], label_lengths[key], output_normalized_tensor=True, colorize=False)
                     segmaps = torch.cat([x.unsqueeze(0) for x in segmaps], 0)
                     vis_images.append(segmaps)
                 if 'edge' in key:

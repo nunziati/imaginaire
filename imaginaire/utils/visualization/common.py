@@ -45,7 +45,7 @@ def tensor2pilimage(image, width=None, height=None, minus1to1_normalized=False):
     width and height.
 
     Args:
-        image (3 x W1 x H1 tensor): Image tensor
+        image (3 x W1 x H1 tensor) or (1 x W1 x H1 tensor): Image tensor
         width (int): Desired width for the result PIL image.
         height (int): Desired height for the result PIL image.
         minus1to1_normalized (bool): True if the tensor values are in [-1,
@@ -56,14 +56,17 @@ def tensor2pilimage(image, width=None, height=None, minus1to1_normalized=False):
     """
     if len(image.size()) != 3:
         raise ValueError('Image tensor dimension does not equal = 3.')
-    if image.size(0) != 3:
+    if image.size(0) != 3 and image.size(0) != 1:
         raise ValueError('Image has more than 3 channels.')
     if minus1to1_normalized:
         # Normalize back to [0, 1]
         image = (image + 1) * 0.5
-    image = image.detach().cpu().squeeze().numpy()
+    image = image.detach().cpu().numpy()
     image = np.transpose(image, (1, 2, 0)) * 255
-    output_img = Image.fromarray(np.uint8(image))
+    
+    output_img = Image.fromarray(
+        np.uint8(image if image.shape[2] == 3 else image[:, :, 0]),
+        mode='RGB' if image.shape[2] == 3 else 'L')
     if width is not None and height is not None:
         output_img = output_img.resize((width, height), Image.BICUBIC)
     return output_img
@@ -120,6 +123,7 @@ def tensor2label(segmap, n_label=None, imtype=np.uint8,
     Returns:
         (numpy.ndarray or normalized torch image).
     """
+
     if segmap is None:
         return None
     if isinstance(segmap, list):
@@ -141,10 +145,14 @@ def tensor2label(segmap, n_label=None, imtype=np.uint8,
         segmap = segmap.max(0, keepdim=True)[1]
 
     if output_normalized_tensor:
-        if n_label == 0:
-            segmap = Colorize(256)(segmap).to('cuda')
+        if colorize:
+            if n_label == 0:
+                segmap = Colorize(256)(segmap).to('cuda')
+            else:
+                segmap = Colorize(n_label)(segmap).to('cuda')
         else:
-            segmap = Colorize(n_label)(segmap).to('cuda')
+            segmap = segmap.float() / segmap.max().float() * 255
+
         return 2 * (segmap.float() / 255) - 1
     else:
         if colorize:
